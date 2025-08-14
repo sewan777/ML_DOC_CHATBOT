@@ -29,13 +29,8 @@ if uploaded_files:
             st.error(f"Error loading documents: {str(e)}")
             st.stop()
 else:
-    #Example documents if no files uploaded
-    docs = [
-        Document(page_content="Hello, this is a test document about machine learning."),
-        Document(page_content="Streamlit + LangChain example for building chatbots."),
-        Document(page_content="This chatbot uses Google's Generative AI embeddings for semantic search.")
-    ]
-    st.info("Using example documents. Upload your own files above to chat with your documents.")
+ 
+               st.error("No documents uploaded. Please upload PDF(s) to proceed.")
 
 #Initialize QA chain safely
 if "qa_chain" not in st.session_state or "docs_hash" not in st.session_state or st.session_state.docs_hash != hash(str(docs)):
