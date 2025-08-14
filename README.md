@@ -160,25 +160,7 @@ The application provides helpful error messages for:
 - Past dates for appointments
 - Missing required information
 
-## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📝 License
-
-This project is open source. Please check the license file for details.
-
-## 🆘 Support
-
-For issues and questions:
-1. Check the troubleshooting section above
-2. Review the error messages in the application
-3. Ensure all dependencies are properly installed
-4. Verify your Google AI API key is valid
 
 ## 🔮 Future Enhancements
 
@@ -190,6 +172,3 @@ For issues and questions:
 - [ ] Advanced appointment management features
 - [ ] Multi-language support
 
----
-
-**Happy chatting and booking! 🎉**
