@@ -6,6 +6,8 @@ from langchain.chains import RetrievalQA
 from langchain.vectorstores import FAISS
 from langchain.docstore.document import Document
 from langchain.text_splitter import CharacterTextSplitter
+from langchain.agents import initialize_agent, Tool, AgentType
+from langchain.memory import ConversationBufferMemory
 import PyPDF2
 import io
 
@@ -107,3 +109,99 @@ def build_qa_chain(docs):
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
         raise
+
+def build_agent_with_tools(docs, form_handler):
+    """Build agent with document QA and appointment booking tools."""
+    
+    if not os.getenv('GOOGLE_API_KEY'):
+        raise ValueError("GOOGLE_API_KEY not found in environment variables")
+    
+    # Initialize embeddings and vector store
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    vectorstore = FAISS.from_documents(docs, embeddings)
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+    
+    # Initialize LLM
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        temperature=0.1,
+        convert_system_message_to_human=True
+    )
+    
+    # Build QA chain for documents
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=retriever,
+        return_source_documents=True
+    )
+    
+    # Define tools
+    def document_qa_tool(query):
+        """Tool function for document QA"""
+        try:
+            if hasattr(qa_chain, 'invoke'):
+                result = qa_chain.invoke({"query": query})
+            else:
+                result = qa_chain({"query": query})
+            
+            answer = result.get('result', 'No answer found')
+            sources = result.get('source_documents', [])
+            
+            response = f"Answer: {answer}\n\n"
+            if sources:
+                response += "Sources:\n"
+                for i, doc in enumerate(sources[:2]):  # Limit to 2 sources
+                    response += f"- Source {i+1}: {doc.page_content[:100]}...\n"
+            
+            return response
+        except Exception as e:
+            return f"Error querying documents: {str(e)}"
+    
+    def book_appointment_tool(input_text):
+        """Tool function to start appointment booking"""
+        form_handler.reset_form()
+        form_handler.form_active = True
+        form_handler.current_step = 'name'
+        return "I'd be happy to help you book an appointment! Let's start by collecting some information. What's your full name?"
+    
+    def process_form_tool(user_input):
+        """Tool function to process form input"""
+        if form_handler.form_active:
+            return form_handler.process_form_input(user_input)
+        else:
+            return "No active form to process."
+    
+    # Create tools list
+    tools = [
+        Tool(
+            name="Document_QA",
+            func=document_qa_tool,
+            description="Use this tool to answer questions based on uploaded documents. Input should be a question about the documents."
+        ),
+        Tool(
+            name="Book_Appointment",
+            func=book_appointment_tool,
+            description="Use this tool when user wants to book an appointment or asks you to call them. Input should be 'start_booking'."
+        ),
+        Tool(
+            name="Process_Form_Input",
+            func=process_form_tool,
+            description="Use this tool to process user input during the appointment booking form. Input should be the user's response."
+        )
+    ]
+    
+    # Initialize memory
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    
+    # Initialize the agent
+    agent = initialize_agent(
+        tools=tools,
+        llm=llm,
+        agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+        memory=memory,
+        verbose=True,
+        handle_parsing_errors=True
+    )
+    
+    return agent
